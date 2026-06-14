@@ -1,0 +1,3 @@
+CREATE DATABASE IF NOT EXISTS `keycloak_db` CHARACTER SET utf8 COLLATE utf8_general_ci;
+GRANT ALL PRIVILEGES ON `keycloak_db`.* TO 'root'@'%';
+FLUSH PRIVILEGES;

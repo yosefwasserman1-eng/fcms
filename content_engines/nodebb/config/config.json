@@ -1,0 +1,15 @@
+{
+    "url": "https://forum.corinthian.local",
+    "secret": "corinthian-super-secret-key-123",
+    "database": "redis",
+    "redis": {
+        "host": "nodebb-db",
+        "port": "6379",
+        "password": "",
+        "database": "0"
+    },
+    "oauth": {
+        "id": "forum-archive",
+        "secret": "5e12Tf5aLJ3jAlEHf2kBkgtMRy1RSWZA"
+    }
+}

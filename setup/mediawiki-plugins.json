@@ -1,0 +1,15 @@
+[
+  {
+    "name": "PluggableAuth",
+    "settings": [
+      "$wgPluggableAuth_EnableAutoLogin = false;",
+      "$wgPluggableAuth_ButtonLabel = 'התחבר דרך מערכת ההזדהות המרכזית';"
+    ]
+  },
+  {
+    "name": "OpenIDConnect",
+    "settings": [
+      "$wgOpenIDConnect_Config['keycloak'] = [ 'clientID' => '${SSO_MW_CLIENT_ID}', 'clientsecret' => '${SSO_MW_CLIENT_SECRET}' ];"
+    ]
+  }
+]

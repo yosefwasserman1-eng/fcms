@@ -1,0 +1,17 @@
+{
+  "actions": {
+    "wiki_edit_engineering_specs": {
+      "description": "עריכת מפרטים הנדסיים בוויקי",
+      "conditions": {
+        "min_reputation": 50,
+        "requires_mfa": true
+      }
+    },
+    "wp_publish_announcement": {
+      "description": "פרסום הודעה רשמית בוורדפרס",
+      "conditions": {
+        "role_match": "editor"
+      }
+    }
+  }
+}
