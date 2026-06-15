@@ -88,7 +88,6 @@ services:
       - "${DOMAIN_CORE}:host-gateway"
     volumes:
       - wp_data:/var/www/html
-      - ./gateway/cart/netfree-ca.crt:/var/www/html/wp-includes/certificates/ca-bundle.crt:ro # הזרקת תעודת נטפרי
     networks:
       - corinthian-net
 
