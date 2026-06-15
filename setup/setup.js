@@ -94,6 +94,19 @@ if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
     console.log("[+] Active SSL certificates found in gateway/cart. Skipping generation.");
 }
 
+// --- הוספה חדשה: יצירת קונפיג NodeBB דינמי ---
+const nodebbTemplatePath = path.join(ROOT_DIR, 'content_engines', 'nodebb', 'config', 'config.json.template');
+const nodebbConfigPath = path.join(ROOT_DIR, 'content_engines', 'nodebb', 'config', 'config.json');
+
+if (fs.existsSync(nodebbTemplatePath)) {
+    console.log("[*] Generating dynamic NodeBB config.json from template...");
+    const nodebbTemplateText = fs.readFileSync(nodebbTemplatePath, 'utf8');
+    const compiledNodebbConf = expandEnvVars(nodebbTemplateText);
+    fs.writeFileSync(nodebbConfigPath, compiledNodebbConf, 'utf8');
+    console.log("[+] Dynamic NodeBB config.json generated successfully!");
+} else {
+    console.error("[-] Warning: config.json.template missing from content_engines/nodebb/config/!");
+}
 // ---------------------------------------------------------
 // Phase 2: Docker Cacheless Build & Orchestration
 // ---------------------------------------------------------
@@ -101,7 +114,7 @@ console.log("\n[2/6] Building clean containers and initializing databases...");
 runCmd("docker compose build --no-cache");
 
 console.log("[*] Launching database clusters...");
-runCmd("docker compose up -d postgres redis db nodebb-db");
+runCmd("docker compose up -d db nodebb-db");
 
 console.log("[*] Waiting 15 seconds for database initialization and init.sql injection...");
 runCmd(process.platform === 'win32' ? "timeout /t 15" : "sleep 15", { stdio: 'ignore' });

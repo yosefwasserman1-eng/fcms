@@ -4,7 +4,6 @@ services:
     image: jpillora/dnsmasq
     container_name: c_dns_server
     volumes:
-      # תוקן: dnsmasq.conf נמצא כעת תחת gateway/dns/
       - ./gateway/dns/dnsmasq.conf:/etc/dnsmasq.conf
     ports:
       - "53:53/udp"
@@ -18,7 +17,6 @@ services:
     ports:
       - "443:443"
     volumes:
-      # תוקן: nginx.conf נמצא כעת תחת gateway/nginx/
       - ./gateway/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./gateway/cart/cert.pem:/etc/nginx/certs/cert.pem:ro
       - ./gateway/cart/key.pem:/etc/nginx/certs/key.pem:ro
@@ -54,7 +52,7 @@ services:
       KC_DB_URL: jdbc:mariadb://corinthian-db-1:3306/keycloak_db
       KC_DB_USERNAME: root
       KC_DB_PASSWORD: root_password
-      KC_HOSTNAME: keycloak.corinthian.local
+      KC_HOSTNAME: ${DOMAIN_SSO} # עודכן דינמית
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY_HEADERS: xforwarded 
       KC_HTTP_ENABLED: "true"
@@ -62,6 +60,9 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     depends_on:
       - db
+    volumes:
+      # שיתוף קובץ ההגדרות הדינמי שנוצר על ידי סקריפט הסטאפ
+      - ./setup/keycloak-realm-dynamic.json:/opt/keycloak/providers/keycloak-realm-dynamic.json
     networks:
       - corinthian-net
     restart: unless-stopped
@@ -78,14 +79,16 @@ services:
       WORDPRESS_DEBUG: 1
       WORDPRESS_DEBUG_DISPLAY: 1
       WORDPRESS_CONFIG_EXTRA: |
-        define('WP_HOME', 'https://archive.corinthian.local');
-        define('WP_SITEURL', 'https://archive.corinthian.local');
+        define('WP_HOME', 'https://${DOMAIN_ARCHIVE}');
+        define('WP_SITEURL', 'https://${DOMAIN_ARCHIVE}');
+      SSL_CERT_FILE: /etc/ssl/certs/netfree-ca.crt # פותר את חסימת נטפרי בהורדת תוספים
     extra_hosts:
-      - "keycloak.corinthian.local:host-gateway"
-      - "archive.corinthian.local:host-gateway"
-      - "core.corinthian.local:host-gateway"
+      - "${DOMAIN_SSO}:host-gateway"
+      - "${DOMAIN_ARCHIVE}:host-gateway"
+      - "${DOMAIN_CORE}:host-gateway"
     volumes:
       - wp_data:/var/www/html
+      - ./gateway/cart/netfree-ca.crt:/var/www/html/wp-includes/certificates/ca-bundle.crt:ro # הזרקת תעודת נטפרי
     networks:
       - corinthian-net
 
@@ -96,11 +99,9 @@ services:
     depends_on:
       - db
     volumes:
-      # תוקן: קובצי הליבה של מדיה-וויקי יושבים פיזית בתוך content_engines/mediawiki/
       - ./content_engines/mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
       - ./content_engines/mediawiki/extensions:/var/www/html/extensions 
       - mw_images:/var/www/html/images
-      # תוקן: תעודת נטפרי הועברה ידנית לתוך תיקיית השער המאובטחת
       - ./gateway/cart/netfree-ca.crt:/etc/ssl/certs/netfree-ca.crt:ro
     environment:
       - SSL_CERT_FILE=/etc/ssl/certs/netfree-ca.crt
@@ -111,9 +112,9 @@ services:
     networks:
       - corinthian-net
     extra_hosts:
-      - "keycloak.corinthian.local:host-gateway"
-      - "archive.corinthian.local:host-gateway"
-      - "core.corinthian.local:host-gateway"
+      - "${DOMAIN_SSO}:host-gateway"
+      - "${DOMAIN_ARCHIVE}:host-gateway"
+      - "${DOMAIN_CORE}:host-gateway"
 
   # --- אפליקציית הניהול והסינכרון הפנימית (Corinthian Core) ---
   core:
@@ -125,9 +126,9 @@ services:
       - /usr/src/app/node_modules         
     command: sh -c "npm install && npm install nodemon && npx nodemon -L app.js"
     extra_hosts:
-      - "keycloak.corinthian.local:host-gateway"
-      - "archive.corinthian.local:host-gateway"
-      - "core.corinthian.local:host-gateway"
+      - "${DOMAIN_SSO}:host-gateway"
+      - "${DOMAIN_ARCHIVE}:host-gateway"
+      - "${DOMAIN_CORE}:host-gateway"
     deploy:
       resources:
         limits:
@@ -151,20 +152,18 @@ services:
     container_name: c_nodebb
     restart: always
     environment:
-      - URL=https://forum.corinthian.local
+      - URL=https://${DOMAIN_FORUM} # עודכן דינמית
       - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/netfree-ca.crt
       - REQUESTS_CA_BUNDLE=/etc/ssl/certs/netfree-ca.crt
       - NODE_OPTIONS=--tls-cipher-list=DEFAULT@SECLEVEL=1 --unhandled-rejections=strict
       - NODE_TLS_REJECT_UNAUTHORIZED=0
     extra_hosts:
-      - "keycloak.corinthian.local:host-gateway"
-      - "forum.corinthian.local:host-gateway"
+      - "${DOMAIN_SSO}:host-gateway"
+      - "${DOMAIN_FORUM}:host-gateway"
     volumes:
-      # עודכן: הזרקת תיקיית ה-custom_plugins לתוך הקונטיינר לצורך פיתוח לייב עם npm link
       - ./content_engines/nodebb/custom_plugins:/usr/src/app/custom_plugins
       - ./content_engines/nodebb/assets:/usr/src/app/public/uploads
       - ./content_engines/nodebb/config/config.json:/usr/src/app/config.json
-      # תוקן: משיכת תעודת נטפרי מתיקיית השער המרוכזת
       - ./gateway/cart/netfree-ca.crt:/etc/ssl/certs/netfree-ca.crt:ro
     depends_on:
       - nodebb-db

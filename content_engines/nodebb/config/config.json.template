@@ -9,7 +9,7 @@
         "database": "0"
     },
     "oauth": {
-        "id": "forum",
-        "secret": "5e12Tf5aLJ3jAlEHf2kBkgtMRy1RSWZA"
+        "id": "${SSO_FORUM_CLIENT_ID}",
+        "secret": "${SSO_FORUM_CLIENT_SECRET}"
     }
 }

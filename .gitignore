@@ -14,5 +14,5 @@ npm-debug.log
 .DS_Store
 Thumbs.db
 
-cert.pem
-key.pem
+*.pem
+content_engines/nodebb/config/config.json
