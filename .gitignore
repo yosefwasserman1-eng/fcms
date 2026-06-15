@@ -16,3 +16,26 @@ Thumbs.db
 
 *.pem
 content_engines/nodebb/config/config.json
+
+# ==========================================
+# WordPress - התעלמות מתוספים ותבניות
+# ==========================================
+# אם תיקיית וורדפרס יושבת תחת content_engines/wordpress:
+content_engines/wordpress/wp-content/plugins/*
+content_engines/wordpress/wp-content/themes/*
+
+# חריגים לוורדפרס: אם יש תוספים ספציפיים שכן כתבת בעצמך ואתה רוצה בגיט
+!content_engines/wordpress/wp-content/plugins/index.php
+
+
+# ==========================================
+# MediaWiki - התעלמות מהרחבות ותבניות עיצוב
+# ==========================================
+# אם תיקיית מדיה-ויקי יושבת תחת content_engines/mediawiki:
+content_engines/mediawiki/extensions/*
+content_engines/mediawiki/skins/*
+
+# חריגים למדיה-ויקי: שומרים על קבצי ברירת המחדל החיוניים של המערכת
+!content_engines/mediawiki/extensions/README
+!content_engines/mediawiki/extensions/index.php
+!content_engines/mediawiki/skins/README

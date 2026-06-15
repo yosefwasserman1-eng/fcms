@@ -150,3 +150,14 @@ wfLoadSkin( 'Vector' );
 
 # End of automatically generated settings.
 # Add more configuration options below.
+# Automatically injected configuration for PluggableAuth
+wfLoadExtension( 'PluggableAuth' );
+$wgPluggableAuth_EnableAutoLogin = false;
+$wgPluggableAuth_ButtonLabel = 'התחבר דרך מערכת ההזדהות המרכזית';
+# End of PluggableAuth configuration
+
+# Automatically injected configuration for OpenIDConnect
+wfLoadExtension( 'OpenIDConnect' );
+$wgOpenIDConnect_Config['keycloak'] = [ 'clientID' => 'mw'
+'clientsecret' => 'mediawiki_secret_key_123' ];
+# End of OpenIDConnect configuration

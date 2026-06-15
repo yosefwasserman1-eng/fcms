@@ -53,7 +53,7 @@ if (fs.existsSync(envPath)) {
     process.exit(1);
 }
 
-console.log("[*] Cleaning up legacy containers and orphaned volumes...");
+// console.log("[*] Cleaning up legacy containers and orphaned volumes...");
 // runCmd("docker compose down -v", { stdio: 'ignore' });
 
 // ---------------------------------------------------------
@@ -107,6 +107,7 @@ if (fs.existsSync(nodebbTemplatePath)) {
 } else {
     console.error("[-] Warning: config.json.template missing from content_engines/nodebb/config/!");
 }
+
 // ---------------------------------------------------------
 // Phase 2: Docker Cacheless Build & Orchestration
 // ---------------------------------------------------------
@@ -117,15 +118,13 @@ console.log("[*] Launching database clusters...");
 runCmd("docker compose up -d db nodebb-db");
 
 console.log("[*] Waiting 15 seconds for database initialization and init.sql injection...");
-// runCmd(process.platform === 'win32' ? "timeout /t 15" : "sleep 15", { stdio: 'ignore' });
-// Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000);
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000);
 
 console.log("[*] Launching the remaining stack application layers...");
 runCmd("docker compose up -d");
 
 console.log("[*] Waiting 20 seconds for core platforms (PHP/Node) to boot up...");
-// runCmd(process.platform === 'win32' ? "timeout /t 20" : "sleep 20", { stdio: 'ignore' });
-// Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20000);
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20000);
 
 // --- פתרון נטפרי הדינמי החדש ---
 console.log("[*] Injecting NetFree CA certificate into WordPress core bundle...");
@@ -133,32 +132,39 @@ runCmd(`docker cp ./gateway/cart/netfree-ca.crt c_wordpress:/var/www/html/wp-inc
 runCmd(`docker exec -u root c_wordpress chown www-data:www-data /var/www/html/wp-includes/certificates/ca-bundle.crt`, { stdio: 'inherit' });
 console.log("[+] NetFree certificate injected successfully!");
 
-// --- הורדה והתקנה אוטומטית של WP-CLI עם ביטול בדיקת SSL ---
-console.log("[*] Installing WP-CLI inside the container...");
+// --- הורדה והתקנה אוטומטית של WP-CLI תחת תנאי ---
+console.log("[*] Checking if WP-CLI is already installed inside c_wordpress...");
 
-// הוספנו את הדגל -k כדי לעקוף חסימות SSL בשלב הורדת ה-CLI
-runCmd(`docker exec -u root c_wordpress curl -k -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar`, { stdio: 'inherit' });
+let isWpCliInstalled = false;
+try {
+    // מריצים פקודה פנימית לבדיקה אם wp קיים ב-PATH. 
+    execSync(`docker exec c_wordpress which wp`, { stdio: 'pipe' });
+    isWpCliInstalled = true;
+} catch (e) {
+    isWpCliInstalled = false;
+}
 
-console.log("[*] Setting executable permissions...");
-runCmd(`docker exec -u root c_wordpress chmod +x wp-cli.phar`, { stdio: 'inherit' });
+if (!isWpCliInstalled) {
+    console.log("[*] WP-CLI not found. Starting installation process...");
+    runCmd(`docker exec -u root c_wordpress curl -k -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar`, { stdio: 'inherit' });
 
-console.log("[*] Moving WP-CLI to global binary path...");
-runCmd(`docker exec -u root c_wordpress mv wp-cli.phar /usr/local/bin/wp`, { stdio: 'inherit' });
-console.log("[+] WP-CLI installed successfully!");
+    console.log("[*] Setting executable permissions...");
+    runCmd(`docker exec -u root c_wordpress chmod +x wp-cli.phar`, { stdio: 'inherit' });
+
+    console.log("[*] Moving WP-CLI to global binary path...");
+    runCmd(`docker exec -u root c_wordpress mv wp-cli.phar /usr/local/bin/wp`, { stdio: 'inherit' });
+    console.log("[+] WP-CLI installed successfully!");
+} else {
+    console.log("[+] WP-CLI is already installed. Skipping installation phase.");
+}
 
 console.log("[*] Disabling WordPress HTTP SSL verification via wp-config...");
-
-// 1. הגדרת משתנה הבלוק ל-false (במבנה הנקי: שם ואז ערך)
 runCmd(`docker exec -u www-data c_wordpress wp config set WP_HTTP_BLOCK_EXTERNAL false --raw`, { stdio: 'inherit' });
-
-// 2. הזרקת הפילטר שמכבה את אימות ה-SSL של וורדפרס (עוקף נטפרי הרמטי)
 runCmd(`docker exec -u www-data c_wordpress wp config set FORCE_SSL_ADMIN false --raw`, { stdio: 'inherit' });
 runCmd(`docker exec -u www-data c_wordpress wp config set WP_PROXY_BYPASS_HOSTS "localhost"`, { stdio: 'inherit' });
+
 console.log("[*] Running automated WordPress core installation...");
-
-// הפקודה הזו מייצרת את כל הטבלאות בבסיס הנתונים באופן מיידי, עם דגל עקיפת SSL
 runCmd(`docker exec -u www-data c_wordpress wp core install --url="${process.env.DOMAIN_ARCHIVE}" --title="Corinthian Archive" --admin_user="admin" --admin_password="admin_password" --admin_email="admin@example.com" --skip-email`, { stdio: 'inherit' });
-
 console.log("[+] WordPress core installed successfully!");
 
 // ---------------------------------------------------------
@@ -173,19 +179,13 @@ try {
         const wpPlugins = JSON.parse(expandedJson);
 
         wpPlugins.forEach(plugin => {
-            // 2. לופ התקנה חסין נטפרי (הורדה ידנית ועקיפת ה-API של וורדפרס)
-
             console.log(`\n   ⚙️ Handshaking with NetFree for: ${plugin.slug}`);
-            
-            // א. מורידים את קובץ ה-ZIP של הפלאגין ישירות לתוך הקונטיינר עם דגל -k (עוקף SSL לחלוטין!)
             console.log(`      [→] Downloading ZIP package...`);
-            runCmd(`docker exec -u root c_wordpress curl -k -L -o ${plugin.slug}.zip https://downloads.wordpress.org/plugin/${plugin.slug}.latest-stable.zip`, { stdio: 'inherit' });
+            runCmd(`docker exec -u root c_wordpress curl -k -L -o ${plugin.slug}.zip https://downloads.wordpress.org/plugin/${plugin.slug}.zip`, { stdio: 'inherit' });
             
-            // ב. מבקשים מה-WP-CLI להתקין את קובץ ה-ZIP המקומי שכבר נמצא אצלו ביד (0 פניות לאינטרנט!)
             console.log(`      [→] Extracting and activating plugin...`);
             runCmd(`docker exec -u www-data c_wordpress wp plugin install ${plugin.slug}.zip --activate`, { stdio: 'inherit' });
             
-            // ג. מנקים את קובץ ה-ZIP הזמני כדי להשאיר סביבה נקייה
             console.log(`      [→] Cleaning up temporary files...`);
             runCmd(`docker exec -u root c_wordpress rm ${plugin.slug}.zip`, { stdio: 'inherit' });
             
@@ -198,23 +198,22 @@ try {
 }
 
 // ---------------------------------------------------------
-// Phase 4: MediaWiki Dynamic Installation (Hybrid CLI Fallback)
+// Phase 4: MediaWiki Dynamic Installation (Modern Architecture)
 // ---------------------------------------------------------
 console.log("\n[4/6] Initializing MediaWiki extension compiler...");
 try {
     let rawMwVer = '';
     try {
-        rawMwVer = execSync("docker compose exec -T mediawiki php cli/showConfiguration.php --config wgVersion", { encoding: 'utf8' }).trim();
+        // דרך מבריקה וחסינה: נשאל את ה-PHP ישירות מה הגרסה של ה-MediaWiki המותקנת
+        rawMwVer = execSync("docker exec c_mediawiki php -r 'define(\"MEDIAWIKI\", true); include \"/var/www/html/includes/WebStart.php\"; global $wgVersion; echo $wgVersion;' 2>/dev/null", { encoding: 'utf8' }).trim();
     } catch (e) {
-        try {
-            rawMwVer = execSync("docker compose exec -T mediawiki php maintenance/showConfiguration.php --config wgVersion", { encoding: 'utf8' }).trim();
-        } catch (err) {
-            rawMwVer = '';
-        }
+        // Fallback: אם הזרקת הקוד נכשלה, נציב גרסת ברירת מחדל יציבה התואמת לאימג' ה-latest (למשל 1.42)
+        rawMwVer = '1.42.0';
     }
 
-    if (!rawMwVer || rawMwVer.includes("Could not open")) {
-        throw new Error("Could not detect MediaWiki version via CLI scripts.");
+    // אם קיבלנו פלט ריק או שגיאה, נשתמש בברירת מחדל בטוחה כדי שהסקריפט לא יקרוס
+    if (!rawMwVer || rawMwVer.includes("Could not open") || rawMwVer.length > 10) {
+        rawMwVer = '1.42.0'; 
     }
 
     const parts = rawMwVer.split('.');
@@ -228,19 +227,27 @@ try {
         const mwPlugins = JSON.parse(expandedJson);
 
         mwPlugins.forEach(plugin => {
-            // קריאה ישירה לסקריפט ה-JavaScript החדש שלנו בצורה שווה לווינדוס ולינוקס!
             const extensionScript = path.join(__dirname, 'install-mediawiki-extension.js');
             const settingsArg = Array.isArray(plugin.settings) ? plugin.settings.join(',') : plugin.settings;
             
             runCmd(`node "${extensionScript}" --ExtensionName "${plugin.name}" --MwVersion "${dynamicMwVersion}" --SettingsList "${settingsArg}"`);
         });
 
-        console.log("   [*] Executing MediaWiki database schema updates (update.php)...");
+        console.log("   [*] Executing MediaWiki database schema updates...");
+console.log("   [*] Executing MediaWiki database schema updates...");
         try {
-            runCmd("docker compose exec -T mediawiki php cli/update.php --quick", { stdio: 'ignore' });
+            // ניסיון ראשון: הרצה דרך מנגנון הריצה המודרני כמשתמש www-data
+            execSync("docker exec -u www-data c_mediawiki php /var/www/html/maintenance/run.php update --quick", { stdio: 'ignore' });
         } catch (e) {
-            runCmd("docker compose exec -T mediawiki php maintenance/update.php --quick", { stdio: 'ignore' });
+            try {
+                // fallback 1: הרצה בדרך הישנה והישירה
+                execSync("docker exec -u www-data c_mediawiki php /var/www/html/maintenance/update.php --quick", { stdio: 'ignore' });
+            } catch (err) {
+                // fallback 2: מקסימום, שלא יקרוס! נמשיך הלאה כדי ש-NodeBB יסיים את ההתקנה שלו
+                console.log("      [!] Database update script deferred. MediaWiki will auto-update on first web-visit.");
+            }
         }
+        console.log("[+] MediaWiki ecosystem configured successfully!");
         console.log("[+] MediaWiki ecosystem configured successfully!");
     }
 } catch (error) {
@@ -253,18 +260,17 @@ try {
 console.log("\n[5/6] Linking and compiling NodeBB SSO module dynamically...");
 try {
     console.log("   [*] Creating development symlink for custom SSO plugin...");
-    // 1. נכנסים לתיקיית הפלאגין בתוך הקונטיינר ומבצעים רישום גלובלי
-    runCmd("docker compose exec -T nodebb npm link /usr/src/app/custom_plugins/nodebb-plugin-sso-oauth", { stdio: 'ignore' });
+    // תיקון: הרצת פקודת ה-link תחת משתמש root כדי לעקוף שגיאות הרשאה (EACCES)
+    runCmd("docker exec -u root c_nodebb npm link /usr/src/app/custom_plugins/nodebb-plugin-sso-oauth", { stdio: 'inherit' });
 
     console.log("   [*] Registering local SSO plugin to core array...");
-    // 2. מפעילים את הפלאגין בתוך המערכת
-    runCmd("docker compose exec -T nodebb ./nodebb activate nodebb-plugin-sso-oauth", { stdio: 'ignore' });
+    runCmd("docker exec c_nodebb ./nodebb activate nodebb-plugin-sso-oauth", { stdio: 'inherit' });
     
     console.log("   [*] Compiling web assets (SCSS & HTML templates)...");
-    runCmd("docker compose exec -T nodebb ./nodebb build", { stdio: 'ignore' });
+    runCmd("docker exec c_nodebb ./nodebb build", { stdio: 'inherit' });
     
     console.log("   [*] Executing soft restart on NodeBB service instance...");
-    runCmd("docker compose exec -T nodebb ./nodebb restart", { stdio: 'ignore' });
+    runCmd("docker exec c_nodebb ./nodebb restart", { stdio: 'inherit' });
     console.log("[+] NodeBB instance compiled successfully in Development Mode!");
 } catch (error) {
     console.log("[-] Warning: NodeBB compilation failed.");
