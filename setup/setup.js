@@ -125,33 +125,8 @@ runCmd("docker compose up -d");
 console.log("[*] Waiting 20 seconds for core platforms (PHP/Node) to boot up...");
 Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20000);
 
-// --- פתרון נטפרי הדינמי והמלא (חגורה ושלייקעס: גם OS וגם אפליקציה) ---
-console.log("[*] Injecting NetFree CA certificate into WordPress Stack...");
-try {
-    // 1. הורדת התעודה הרשמית ישירות לתוך נתיב ה-CA של לינוקס בקונטיינר
-    execSync('docker exec -u root c_wordpress curl -k -sL "https://netfree.link/netfree-ca.crt" -o /usr/local/share/ca-certificates/netfree-ca.crt', { stdio: 'inherit' });
-    
-    // 2. רענון מאגר התעודות של השרת (OS Layer)
-    execSync('docker exec -u root c_wordpress update-ca-certificates', { stdio: 'inherit' });
-    
-    // 3. שרשור בטוח של תעודת נטפרי לסוף ה-Bundle הפנימי של וורדפרס (Application Layer)
-    // אנחנו משתמשים ב- >> כדי להוסיף לסוף הקובץ הקיים מבלי לדרוס אותו
-    execSync('docker exec -u root c_wordpress sh -c "cat /usr/local/share/ca-certificates/netfree-ca.crt >> /var/www/html/wp-includes/certificates/ca-bundle.crt"', { stdio: 'inherit' });
-    
-    // 4. תיקון הרשאות לקובץ ה-Bundle המעודכן
-    execSync('docker exec -u root c_wordpress chown www-data:www-data /var/www/html/wp-includes/certificates/ca-bundle.crt', { stdio: 'ignore' });
+runCmd("docker exec -it c_wordpress update-ca-certificates");
 
-    // 5. אילוץ שירות ה-PHP להתרענן לקריאת התעודה החדשה
-    execSync('docker exec -u root c_wordpress kill -USR2 1', { stdio: 'ignore' });
-    
-    console.log("[✓] Complete! Both Container OS and WordPress core now fully trust NetFree CA.");
-} catch (caError) {
-    console.log("[-] Warning: Failed to apply advanced NetFree injection, attempting fallback...");
-    runCmd(`docker cp ./gateway/cart/netfree-ca.crt c_wordpress:/var/www/html/wp-includes/certificates/ca-bundle.crt`, { stdio: 'ignore' });
-    runCmd(`docker exec -u root c_wordpress chown www-data:www-data /var/www/html/wp-includes/certificates/ca-bundle.crt`, { stdio: 'ignore' });
-}
-
-// --- הורדה והתקנה אוטומטית של WP-CLI תחת תנאי ---
 console.log("[*] Checking if WP-CLI is already installed inside c_wordpress...");
 let isWpCliInstalled = false;
 try {
@@ -163,7 +138,7 @@ try {
 
 if (!isWpCliInstalled) {
     console.log("[*] WP-CLI not found. Starting installation process...");
-    runCmd(`docker exec -u root c_wordpress curl -k -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar`, { stdio: 'inherit' });
+    runCmd(`docker exec -u root c_wordpress curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar`, { stdio: 'inherit' });
 
     console.log("[*] Setting executable permissions...");
     runCmd(`docker exec -u root c_wordpress chmod +x wp-cli.phar`, { stdio: 'inherit' });
@@ -190,18 +165,8 @@ try {
         const expandedJson = expandEnvVars(rawJson);
         const wpPlugins = JSON.parse(expandedJson);
 
-        wpPlugins.forEach(plugin => {
-            console.log(`\n   ⚙️ Handshaking with NetFree for: ${plugin.slug}`);
-            console.log(`      [→] Downloading ZIP package...`);
-            runCmd(`docker exec -u root c_wordpress curl -k -L -o ${plugin.slug}.zip https://downloads.wordpress.org/plugin/${plugin.slug}.zip`, { stdio: 'inherit' });
-            
-            console.log(`      [→] Extracting and activating plugin (with force overwrite)...`);
-            // תיקון: הוספת --force כדי למנוע שגיאות של תיקייה קיימת בהרצות חוזרות
-            runCmd(`docker exec -u www-data c_wordpress wp plugin install ${plugin.slug}.zip --force --activate`, { stdio: 'inherit' });
-            
-            console.log(`      [→] Cleaning up temporary files...`);
-            runCmd(`docker exec -u root c_wordpress rm ${plugin.slug}.zip`, { stdio: 'inherit' });
-            
+        wpPlugins.forEach(plugin => {          
+            runCmd(`docker exec -u www-data c_wordpress wp plugin install ${plugin.slug} --force --activate`, { stdio: 'inherit' });           
             console.log(`   [+] ${plugin.slug} is live and active!`);
         });
         console.log("[+] WordPress environment setup completed!");
@@ -272,15 +237,15 @@ try {
 
         // 2. הרצת פקודת ההתקנה הרשמית במצב שקט
         // אנחנו מזריקים את משתני הסביבה דרך אובייקט ה-env של Node.js, מה שעוקף לחלוטין בעיות גרשיים בלינוקס!
-        execSync('docker exec c_nodebb ./nodebb setup --silent', {
+        execSync('docker exec c_nodebb ./nodebb setup', {
             stdio: 'inherit',
-            env: {
-                ...process.env, // שומר על משתני הסביבה הקיימים של הסקריפט
-                'setup__admin:username': 'admin',
-                'setup__admin:password': 'admin_password_123',
-                'setup__admin:password:confirm': 'admin_password_123',
-                'setup__admin:email': `admin@${process.env.DOMAIN_FORUM}`
-            }
+            // env: {
+            //     ...process.env, // שומר על משתני הסביבה הקיימים של הסקריפט
+            //     'setup__admin:username': 'admin',
+            //     'setup__admin:password': 'admin_password_123',
+            //     'setup__admin:password:confirm': 'admin_password_123',
+            //     'setup__admin:email': `admin@${process.env.DOMAIN_FORUM}`
+            // }
         });
         console.log("[✓] NodeBB official CLI setup completed successfully!");
     } catch (nodebbError) {

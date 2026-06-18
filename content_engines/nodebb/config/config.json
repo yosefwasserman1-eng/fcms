@@ -11,5 +11,6 @@
     "oauth": {
         "id": "forum",
         "secret": "5e12Tf5aLJ3jAlEHf2kBkgtMRy1RSWZA"
-    }
+    },
+    "port": 4567
 }
