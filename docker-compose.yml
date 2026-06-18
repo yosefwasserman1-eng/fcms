@@ -60,9 +60,6 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     depends_on:
       - db
-    volumes:
-      # שיתוף קובץ ההגדרות הדינמי שנוצר על ידי סקריפט הסטאפ
-      - ./setup/keycloak-realm-dynamic.json:/opt/keycloak/providers/keycloak-realm-dynamic.json
     networks:
       - corinthian-net
     restart: unless-stopped
@@ -81,13 +78,13 @@ services:
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_HOME', 'https://${DOMAIN_ARCHIVE}');
         define('WP_SITEURL', 'https://${DOMAIN_ARCHIVE}');
-      SSL_CERT_FILE: /etc/ssl/certs/netfree-ca.crt # פותר את חסימת נטפרי בהורדת תוספים
     extra_hosts:
       - "${DOMAIN_SSO}:host-gateway"
       - "${DOMAIN_ARCHIVE}:host-gateway"
       - "${DOMAIN_CORE}:host-gateway"
     volumes:
       - wp_data:/var/www/html
+      - ./gateway/cart/netfree-ca.crt:/usr/local/share/ca-certificates/netfree-ca.crt:ro
     networks:
       - corinthian-net
 
