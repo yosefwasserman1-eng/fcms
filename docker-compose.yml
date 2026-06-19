@@ -88,6 +88,13 @@ services:
     networks:
       - corinthian-net
 
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8080:8080"
+    networks:
+      - corinthian-net
+
   # --- האנציקלופדיה הקהילתית (MediaWiki) ---
   mediawiki:
     image: mediawiki:latest

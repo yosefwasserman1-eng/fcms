@@ -2,7 +2,16 @@
   {
     "slug": "daggerhart-openid-connect-generic",
     "options": {
-      "openid_connect_generic_settings": "{\"client_id\":\"${SSO_WP_CLIENT_ID}\",\"client_secret\":\"${SSO_WP_CLIENT_SECRET}\",\"endpoint_login\":\"https://${DOMAIN_SSO}/realms/corinthian/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"https://${DOMAIN_SSO}/realms/corinthian/protocol/openid-connect/userinfo\",\"endpoint_token\":\"https://${DOMAIN_SSO}/realms/corinthian/protocol/openid-connect/token\",\"endpoint_end_session\":\"https://${DOMAIN_SSO}/realms/corinthian/protocol/openid-connect/logout\",\"login_type\":\"button\",\"no_sslverify\":\"1\"}"
+      "openid_connect_generic_settings": {
+        "login_button_text":"SSO Login",
+        "client_id":"${SSO_WP_CLIENT_ID}",
+        "client_secret":"${SSO_WP_CLIENT_SECRET}",
+        "endpoint_login":"https://${DOMAIN_SSO}/realms/fcms/protocol/openid-connect/auth",
+        "endpoint_userinfo":"https://${DOMAIN_SSO}/realms/fcms/protocol/openid-connect/userinfo",
+        "endpoint_token":"https://${DOMAIN_SSO}/realms/fcms/protocol/openid-connect/token",
+        "endpoint_end_session":"https://${DOMAIN_SSO}/realms/fcms/protocol/openid-connect/logout",
+        "endpoint_jwks":"https://${DOMAIN_SSO}/realms/fcms/protocol/openid-connect/certs"
+      }
     }
   }
 ]

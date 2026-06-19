@@ -1,5 +1,5 @@
 {
-    "url": "https://forum.corinthian.local",
+    "url": "https://forum.fcms.local",
     "secret": "corinthian-super-secret-key-123",
     "database": "redis",
     "redis": {
